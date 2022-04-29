@@ -16,8 +16,38 @@ from utils.Params import Params
 from reachability_nonlinear import params2options, checkOptionsReach
 import numpy.matlib as matlib
 from Interval import Interval
-from Stirred_tank_sys import cstrdiscr, load_model
+from scipy.io import loadmat
 
+def cstrdiscr(dt, x, u):
+    """
+        discrete-time version of the stirred-tank reactor system
+    """
+    rho = 1000
+    Cp = 0.239
+    deltaH = -5e4
+    E_R = 8750
+    k0 = 7.2e10
+    UA = 5e4
+    q = 100
+    Tf = 350
+    V = 100
+    C_Af = 1
+    C_A0 = 0.5
+    T_0 = 350
+    T_c0 = 300
+    U = np.matmul(np.array([-3, -6.9]), x)
+    x_temp = np.array([x[0, 0] + C_A0, x[1, 0]+T_0]).reshape(2, 1)
+    U = U + np.array([T_c0])
+    f1 = ((1-(q*dt)/(2*V) - k0*dt*np.exp(-E_R /
+          x_temp[1, 0]))*x_temp[0, 0] + q/V * C_Af * dt)/(1 + (q*dt)/(2*V)) + u[0]*dt
+    f2 = (x_temp[1, 0]*(1-0.5*dt - (dt*UA)/(2*V*rho*Cp)) + dt*(Tf*q/V + (UA*U)/(V*rho*Cp)) - x_temp[0, 0] *
+          (deltaH*k0*dt)/(rho*Cp) * np.exp(-E_R/x_temp[1, 0])) / (1+0.5*dt*q/V+(dt*UA)/(2*V*rho*Cp)) + u[1, 0]*dt
+    f1 = f1 - C_A0
+    f2 = f2 - T_0
+    return np.array([f1, f2]).reshape(2, 1)
+
+def load_model():
+    return [reduce_girard(Zonotope(loadmat(f'model_for_stirred_tank\\{i}.mat')["var"]), 3) for i in range(0, 5)]
 
 def linReach_DT(data, options):
         options.params["Uorig"] = options.params["U"] + \
@@ -197,12 +227,12 @@ if __name__ == "__main__":
     U = Zonotope(np.array(np.array([0.01, 0.01]).reshape((2, 1))),
                  np.diag([0.1, .2]))
     R0 = Zonotope(np.array([-1.9, -20]).reshape((dim_x, 1)),
-                  np.diag([0.005, .1]))
+                  np.diag([0.005, .3]))
     dt = 0.015
     initpoints = 1
-    steps = 30
+    steps = 20
     wfac = 1e-4
     nl_sys = NonLinear_sys(dt, U, R0, wfac, dim_x, initpoints, steps, cstrdiscr)
-    #data = nl_sys.run_reachability(5, True)
+    data = nl_sys.run_reachability(5, False)
     model = load_model()
-    plot_results([model], True, "", ["Model"])
+    plot_results([model, data], True, "", ["Model", "Reachability"])

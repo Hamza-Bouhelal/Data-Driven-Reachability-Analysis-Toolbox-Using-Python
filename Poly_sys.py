@@ -34,7 +34,6 @@ class Poly_sys:
                 dummy.append(np.hstack((left, right)))
             GW.append(np.array(dummy))
         GW = np.array(GW[0])
-
         self.Wmatzono = MatZonotope(np.zeros((self.dim_x, self.totalsamples)), GW)
         self.zonotopeOrder = 100
         self.tensorOrder = 2

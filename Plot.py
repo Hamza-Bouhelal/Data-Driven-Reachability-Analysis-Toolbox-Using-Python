@@ -81,8 +81,8 @@ def plot_results(data, plot=True, save='', titles=[]):
                 pass
             for ele in result:
                 plot_zono(ax, ele, i*2, color)
-        ax.set_xlabel('Dim ' + str(i*2 + 1))
-        ax.set_ylabel('Dim ' + str(i*2+ 2))
+        ax.set_xlabel('X' + str(i*2 + 1))
+        ax.set_ylabel('X' + str(i*2+ 2))
         if len(legends) == len(data):
             plt.legend(handles=legends)
         if save != '':
@@ -103,8 +103,8 @@ def plot_results(data, plot=True, save='', titles=[]):
                     ind += 1
                     for ele in result:
                         plot_zono(ax, ele, i*2 + 1, color)
-                ax.set_xlabel('Dim ' + str(i*2 + 2))
-                ax.set_ylabel('Dim ' + str(i*2 + 3))
+                ax.set_xlabel('X' + str(i*2 + 2))
+                ax.set_ylabel('X ' + str(i*2 + 3))
                 if len(legends) == 2:
                     plt.legend(handles=legends)
                 if save != '':
