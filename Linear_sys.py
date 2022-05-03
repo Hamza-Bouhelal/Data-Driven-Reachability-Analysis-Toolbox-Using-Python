@@ -1,11 +1,10 @@
-
 import matplotlib.pyplot as plt
 import numpy as np
 from control import c2d, ss
 from numpy.linalg import pinv
 from tqdm import tqdm
 from Plot import plot_results
-from reducegens import reduce_girard
+from Utils import reduce_girard
 import time
 import sys
 sys.path.append("D:\\Desktop\\thesis\\brsl\\scripts\\reachability")
@@ -31,7 +30,7 @@ class linear_sys():
 
     """
 
-    def __init__(self, A: np.ndarray, B_ss: np.ndarray, C: np.ndarray, D, X0: Zonotope, U: Zonotope, W: Zonotope, dim_x: int, initpoints: int, steps: int, samplingtime):
+    def __init__(self, A: np.ndarray, B_ss: np.ndarray, C: np.ndarray, D, X0: Zonotope, U: Zonotope, W: Zonotope, dim_x: int, initpoints: int, steps: int, samplingtime, zonoOrder=3):
         if A.shape[0] != dim_x:
             raise ValueError(
                 f"Shape error: A must be of shape ({dim_x}, {dim_x})")
@@ -54,6 +53,7 @@ class linear_sys():
         self.dim_x = dim_x
         self.steps = steps
         self.samplingtime = samplingtime
+        self.zonoOrder = zonoOrder
 
     def build_model(self, totalsteps: int, plot=False, save=''):
         """
@@ -66,7 +66,7 @@ class linear_sys():
         model = [self.X0]
         print(f"Building model...")
         for i in tqdm(range(totalsteps)):
-            model[i] = reduce_girard(model[i], 400)
+            model[i] = reduce_girard(model[i], self.zonoOrder)
             model.append(model[i] * self.sys_d.A +
                          self.U * self.sys_d.B + self.W)
         print("Model built!\n" + 60*"=" + "\n")
@@ -76,7 +76,7 @@ class linear_sys():
 
     def buildMw(self):
         """ 
-        Builds the noise Zonotope Mw from the noise zonotope W
+        Builds the noise MatZonotope Mw from the noise zonotope W
         """
         GW = []
         for i in range(self.W.generators().shape[1]):
@@ -167,14 +167,14 @@ class linear_sys():
         t1 = time.time()
         for i in tqdm(range(totalsteps)):
             #print(f"\nxdata[{i}] before: {X_data[i].generators().shape}")
-            X_data[i] = reduce_girard(X_data[i], 3)
+            X_data[i] = reduce_girard(X_data[i], self.zonoOrder)
             #print(f"xdata[{i}] after: {X_data[i].generators().shape}")
             X_data.append(AB * X_data[i].cart_prod(self.U) + self.W)
-        X_data[-1] = reduce_girard(X_data[-1], 3)
+        X_data[-1] = reduce_girard(X_data[-1], self.zonoOrder)
         t2 = time.time() - t1
         print("Reachability took {} seconds.\n\n".format(t2))
         if plot or save != '':
-            plot_results(X_data, plot, save)
+            plot_results(X_data, plot, save, x0=self.X0)
         return X_data
 
     def Run_reachability_and_model_based(self, totalsteps, plot=False, save=''):
@@ -189,12 +189,12 @@ class linear_sys():
         X_data = self.reach(totalsteps)
         if plot or save != '':
             plot_results([model, X_data], plot, save,
-                         titles=['Model', 'Reachability'])
+                         titles=['Model', 'Reachability'], x0=self.X0)
         return model, X_data
 
 
 if  __name__ == "__main__":
-    steps = 120
+    steps = 100
     initpoints = 1
     dim_x = 5
     X0 = Zonotope(np.array(np.ones((dim_x, 1))), 0.1 *
@@ -209,3 +209,7 @@ if  __name__ == "__main__":
     L_sys = linear_sys(A, B_ss, C, D, X0, U, W, dim_x, initpoints, steps, 0.05)
     model, xdata = L_sys.Run_reachability_and_model_based(
         5, plot=True)
+    for path in sys.path:
+        if path == "D:\\Desktop\\thesis\\brsl\\scripts\\reachability":
+            sys.path.remove(path)
+    

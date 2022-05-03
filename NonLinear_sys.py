@@ -2,9 +2,10 @@ from numpy.linalg import pinv
 import warnings
 import time
 from Plot import plot_results
-from reducegens import reduce_girard
+from Utils import reduce_girard
 import numpy as np
 import sys
+import pickle
 from tqdm import tqdm
 sys.path.append("D:\\Desktop\\thesis\\brsl\\scripts\\reachability")
 warnings.filterwarnings("ignore", category=RuntimeWarning)
@@ -14,27 +15,13 @@ from MatZonotope import MatZonotope
 from utils.Options import Options
 from utils.Params import Params
 from reachability_nonlinear import params2options, checkOptionsReach
-import numpy.matlib as matlib
 from Interval import Interval
-from scipy.io import loadmat
+import numpy.matlib as matlib
 
-def cstrdiscr(dt, x, u):
+def cstrdiscr(dt, x, u, rho = 1000, Cp = 0.239, deltaH = -5e4, E_R = 8750, k0 = 7.2e10, UA = 5e4, q = 100, Tf = 350, V = 100, C_Af = 1, C_A0 = 0.5, T_0 = 350, T_c0 = 300):
     """
         discrete-time version of the stirred-tank reactor system
     """
-    rho = 1000
-    Cp = 0.239
-    deltaH = -5e4
-    E_R = 8750
-    k0 = 7.2e10
-    UA = 5e4
-    q = 100
-    Tf = 350
-    V = 100
-    C_Af = 1
-    C_A0 = 0.5
-    T_0 = 350
-    T_c0 = 300
     U = np.matmul(np.array([-3, -6.9]), x)
     x_temp = np.array([x[0, 0] + C_A0, x[1, 0]+T_0]).reshape(2, 1)
     U = U + np.array([T_c0])
@@ -47,7 +34,9 @@ def cstrdiscr(dt, x, u):
     return np.array([f1, f2]).reshape(2, 1)
 
 def load_model():
-    return [reduce_girard(Zonotope(loadmat(f'model_for_stirred_tank\\{i}.mat')["var"]), 3) for i in range(0, 5)]
+    with open('NonLinear_Model.obj', 'rb') as f:
+        return pickle.load(f)
+    
 
 def linReach_DT(data, options):
         options.params["Uorig"] = options.params["U"] + \
@@ -61,7 +50,7 @@ def linReach_DT(data, options):
         IAB = np.dot(options.params["X_1T"], pinv(np.vstack(
             [oneMat, options.params["X_0T"] + (-1 * xStarMat), options.params["U_full"] + -1 * uStarMat])))
         V = -1 * (options.params["Wmatzono"] + np.dot(IAB, np.vstack([oneMat, options.params["X_0T"]+(-1*xStarMat), options.params["U_full"] +
-                                                                      -1 * uStarMat]))) + options.params["X_1T"]
+            -1 * uStarMat]))) + options.params["X_1T"]
         VInt = V.interval_matrix()
         leftLimit = VInt.Inf
         rightLimit = VInt.Sup
@@ -88,7 +77,7 @@ class NonLinear_sys():
     steps: number of time steps that will be propagated
     func: function that defines the system dynamics
     """
-    def __init__(self, dt:int, U:Zonotope, R0:Zonotope, wfac:float, dim_x:int, initpoints:int, steps:int, func, zonoOrder:int = 100, tensorOrder:int = 2, errorOrder:int = 5):
+    def __init__(self, dt:int, U:Zonotope, R0:Zonotope, wfac:float, dim_x:int, initpoints:int, steps:int, func, zonoOrder:int = 3, tensorOrder:int = 2, errorOrder:int = 5):
         if isinstance(R0, Zonotope) == False:
             raise TypeError(f"X0 must be of type Zonotope")
         elif isinstance(U, Zonotope) == False:
@@ -108,13 +97,14 @@ class NonLinear_sys():
         self.options.params["zonotopeOrder"] = zonoOrder
         self.options.params["tensorOrder"] = tensorOrder
         self.options.params["errorOrder"] = errorOrder
-        self.u = [U.rand_point() for _ in range(self.totalsamples)]
         self.params.params["U"] = U
         self.params.params["R0"] = R0
         self.func = func
 
     def buildMW(self):
-        """ Builds the noise Zonotope Mw """
+        """ 
+        Builds the noise MatZonotope Mw from the noise zonotope W
+        """
         self.W = Zonotope(np.array(np.zeros(
             (self.options.params["dim_x"], 1))), self.wfac * np.ones((self.options.params["dim_x"], 1)))
         self.params.params["W"] = self.W
@@ -138,6 +128,7 @@ class NonLinear_sys():
         Simulates the system with the given parameters
         """
         x = []
+        self.u = [U.rand_point() for _ in range(self.totalsamples)]
         idx = 0
         print(f"Propagating {self.initpoints} initpoints {self.steps} time...")
         for _ in tqdm(range(0, self.initpoints*self.dim_x, self.dim_x)):
@@ -168,25 +159,25 @@ class NonLinear_sys():
         #print(X_1t.shape)
         U_full = np.array(self.u).reshape((-1, self.totalsamples))
         #print(U_full.shape)
-        return X_0t, X_1t, U_full
-
-    def compute_Lipschits_const(self, X_0t, X_1t, U_full):
-        """Computes the Lipschitz constant of the system"""
         self.options.params["X_0T"] = X_0t
         self.options.params["X_1T"] = X_1t
         self.options.params["U_full"] = U_full
+        return X_0t, X_1t
+
+    def compute_Lipschits_const(self, X_0t, X_1t):
+        """Computes the Lipschitz constant of the system"""
         """ L = 0
         for i in range(self.totalsamples):
             z1 = np.hstack([np.array(X_0t[:, i]).flatten(), np.array(self.u).flatten(order='F')[i]])
             f1 = np.array([X_1t[:, i]])
             for j in range(self.totalsamples):
-                if i != j:
-                    z2 = np.hstack([np.array(X_0t)[:, j].flatten(), np.array(self.u).flatten(order='F')[j]])
-                    f2 = np.array([X_1t[:, j]])
-                    newnorm = np.linalg.norm(f1 - f2)  / np.linalg.norm(z1 - z2)
-                    if newnorm > L:
-                        L = newnorm 
-                        eps = L * np.linalg.norm(z1 - z2) """
+                z2 = np.hstack([np.array(X_0t)[:, j].flatten(), np.array(self.u).flatten(order='F')[j]])
+                f2 = np.array([X_1t[:, j]])
+                newnorm = np.linalg.norm(np.subtract(f1, f2))  / np.linalg.norm(np.subtract(z1, z2))
+                if newnorm > L:
+                    L = newnorm 
+                    eps = L * np.linalg.norm(np.subtract(z1, z2))
+        print(eps) """
         eps = 0.0035
         self.options.params["Zeps"] = Zonotope(np.array(np.zeros(
             (self.dim_x, 1))), eps * np.diag(np.ones((self.options.params["dim_x"], 1)).T[0]))
@@ -203,8 +194,8 @@ class NonLinear_sys():
         save: if not empty create a directory and saves plots of the results to that directory
         """
         x = self.Simulate_sys()
-        X_0t, X_1t, ufull = self.combine_trajs(x)
-        self.compute_Lipschits_const(X_0t, X_1t, ufull)
+        X_0t, X_1t = self.combine_trajs(x)
+        self.compute_Lipschits_const(X_0t, X_1t)
         options = params2options(self.params, self.options)
         options = checkOptionsReach(options, 0)
         R_data = [self.params.params["R0"]]
@@ -214,7 +205,7 @@ class NonLinear_sys():
             if('uTransVec' in options.params):
                 options.params['uTrans'] = options.params["uTransVec"][:, i]
             data = linReach_DT(R_data[i], options)
-            R_data.append(reduce_girard(data, 3))
+            R_data.append(reduce_girard(data, self.options.params["zonotopeOrder"] ))
         t2 = time.time() - t1
         print("Reachability took {} seconds.\n\n".format(t2))
         if plot or save != '':
@@ -234,5 +225,5 @@ if __name__ == "__main__":
     wfac = 1e-4
     nl_sys = NonLinear_sys(dt, U, R0, wfac, dim_x, initpoints, steps, cstrdiscr)
     data = nl_sys.run_reachability(5, False)
-    model = load_model()
-    plot_results([model, data], True, "", ["Model", "Reachability"])
+    model = [R0] + load_model()
+    plot_results([model, data], True, "", ["Model", "Reachability"], x0=R0)

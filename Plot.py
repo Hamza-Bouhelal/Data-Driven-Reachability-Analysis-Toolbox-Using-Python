@@ -1,6 +1,3 @@
-from itertools import product
-from mpl_toolkits.mplot3d.art3d import Poly3DCollection
-from math import sqrt
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import os
@@ -48,7 +45,7 @@ def plot_zono(ax, Z, step, color):
     ax.plot(all[temp,0], all[temp,1], color=color, lw=1)
 
 
-def plot_results(data, plot=True, save='', titles=[]):
+def plot_results(data, plot=True, save='', titles=[], x0=None):
     """Plots all 2d dimensions of the zonotopes inside the list 'data' or lists of zonotope in 'data'.
     
     plot: if True, plots the results.
@@ -63,17 +60,19 @@ def plot_results(data, plot=True, save='', titles=[]):
         raise TypeError("data : List of lists of Zonotopes or list of Zonotopes")
     if save != '':
         final_directory = makedir(save)
-    colors = ['red', 'green', 'blue', 'black', 'orange',
+    colors = ['red', 'green', 'blue', 'orange',
               'purple', 'brown', 'gray']
+    finalcolors = [colors.pop(random.randint(0, len(colors)-1)) for _ in range(len(data))]
     for i in range(0, int(data[0][0].center().shape[0]/2)):
         plt.rcParams["figure.autolayout"] = True
         fig = plt.figure()
         ax = fig.add_subplot()
         legends = []
         ind = 0
+        tt = 0
         for result in data:
-            color = colors[random.randint(0, len(colors)-1)]
-            colors.pop(colors.index(color))
+            color = finalcolors[tt]
+            tt += 1
             try:
                 legends.append(mpatches.Patch(color=color, label=titles[ind]))
                 ind += 1
@@ -83,7 +82,12 @@ def plot_results(data, plot=True, save='', titles=[]):
                 plot_zono(ax, ele, i*2, color)
         ax.set_xlabel('X' + str(i*2 + 1))
         ax.set_ylabel('X' + str(i*2+ 2))
+        if x0 is not None:
+            plot_zono(ax, x0, i*2, "black")
         if len(legends) == len(data):
+            if x0 is not None:
+                legends = [mpatches.Patch(
+                        color="black", label="Initial set")] + legends
             plt.legend(handles=legends)
         if save != '':
             plt.savefig(f"{final_directory}/ Plot n{i+1}.png")
@@ -96,8 +100,10 @@ def plot_results(data, plot=True, save='', titles=[]):
                 ax = fig.add_subplot()
                 legends = []
                 ind = 0
+                tt = 0
                 for result in data:
-                    color = colors[random.randint(0, len(colors)-1)]
+                    color = finalcolors[tt]
+                    tt += 1
                     legends.append(mpatches.Patch(
                         color=color, label=titles[ind]))
                     ind += 1
@@ -105,7 +111,12 @@ def plot_results(data, plot=True, save='', titles=[]):
                         plot_zono(ax, ele, i*2 + 1, color)
                 ax.set_xlabel('X' + str(i*2 + 2))
                 ax.set_ylabel('X ' + str(i*2 + 3))
-                if len(legends) == 2:
+                if x0 is not None:
+                    plot_zono(ax, x0, i*2 + 1, "black")
+                if len(legends) == len(data):
+                    if x0 is not None:
+                        legends = [mpatches.Patch(
+                        color="black", label="Initial set")] + legends
                     plt.legend(handles=legends)
                 if save != '':
                     plt.savefig(f"{final_directory}/ Plot n{i+2}.png")
