@@ -9,7 +9,7 @@ from Zonotope import Zonotope
 from scipy.spatial import ConvexHull
 
 def get_points_2d(zono, step):
-    """Return the points that compose the Zonotope 'zono, at dims 'step' and 'step' + 1.'."""
+    """Return the points that compose the Zonotope 'zono, at dims 'step' and 'step' + 1."""
     tempx = []
     tempy = []
     gens = zono.generators()[step:step+2]
@@ -51,6 +51,7 @@ def plot_results(data, plot=True, save='', titles=[], x0=None):
     plot: if True, plots the results.
     save: if not empty, saves the results in the directory 'save'.
     titles: if not empty, plots the results with the titles in the list 'titles'.
+    x0: if not None, plots zonotope x0 over the results.
     """
     if isinstance(data, list) and False not in [isinstance(ele, Zonotope) for ele in data]:
         data = [data]
@@ -104,9 +105,11 @@ def plot_results(data, plot=True, save='', titles=[], x0=None):
                 for result in data:
                     color = finalcolors[tt]
                     tt += 1
-                    legends.append(mpatches.Patch(
-                        color=color, label=titles[ind]))
-                    ind += 1
+                    try:
+                        legends.append(mpatches.Patch(color=color, label=titles[ind]))
+                        ind += 1
+                    except:
+                        pass
                     for ele in result:
                         plot_zono(ax, ele, i*2 + 1, color)
                 ax.set_xlabel('X' + str(i*2 + 2))
@@ -138,4 +141,3 @@ def makedir(save):
     os.mkdir(final_directory)
     print("\nCreated directory at : ", final_directory)
     return final_directory
-

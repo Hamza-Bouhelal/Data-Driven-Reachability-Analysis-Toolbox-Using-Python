@@ -5,6 +5,7 @@ from Zonotope import Zonotope
 from Interval import Interval
 import numpy.matlib as matlib
 
+
 def picked_generators(zono, order):
         Z = Zonotope()
         Z = Z.copy(zono)
@@ -42,30 +43,58 @@ def reduce_girard(zono, order):
             Zred.Z = np.hstack((center, Gunred, Gbox))
         return Zred
 
+def interval_square(op1):
+    if isinstance(op1, Interval):
+        infs = get_elements_of_nested_list(op1.inf.tolist())
+        sups = get_elements_of_nested_list(op1.sup.tolist())
+        return Interval(np.array([ele**2 for ele in infs]), np.array([ele**2 for ele in sups]))
+    else:
+        raise Exception("Interval square is only defined for Intervals!")
+
+def interval_mul_2(op1, op2):
+    infs1 = get_elements_of_nested_list(op1.inf.tolist())
+    sups1 = get_elements_of_nested_list(op1.sup.tolist())
+    infs2 = get_elements_of_nested_list(op2.inf.tolist())
+    sups2 = get_elements_of_nested_list(op2.sup.tolist())
+    final_inf = []
+    final_sup = []
+    for i in range(len(infs1)):
+        final_inf.append(infs1[i]*infs2[i])
+        final_sup.append(sups1[i]*sups2[i])
+    return Interval(np.array(final_inf), np.array(final_sup))
+
 def Interval_multiplication(op1, op2):
     if isinstance(op1, Interval) and isinstance(op2, Interval):
-        I1 = op1.inf
-        S1 = op1.sup
-        try:
-            m, n = I1.shape
-        except:
-            print('I1.shape', I1.shape)
-            m, n = I1.shape[0]
-        try:
-            m1, n1 = op2.inf.shape
-        except:
-            m1, n1 = op2.inf.shape[0]
-        A = Interval()
-        Binf = []
-        Bsup = []
-        for i in range(m):
-            A.inf = matlib.repmat(I1[i, :],n1, 0).conj().T
-            A.sup = matlib.repmat(S1[i, :],n1, 0).conj().T
-            B = Interval_multiplication(A, op2)
-            Binf.append(B.inf.sum(axis=0))
-            Bsup.append(B.sup.sum(axis=0))
-        print("done")
-        return Interval(np.array(Binf), np.array(Bsup))
+        if op1.inf.shape[0] == 1 and op1.sup.shape[0] == 1 and op2.inf.shape[0] == 1 and op2.sup.shape[0] == 1:
+            i =  Interval()
+            i.inf = min([op1.inf[0]*op2.inf[0], op1.inf[0]*op2.sup[0], op1.sup[0]*op2.inf[0], op1.sup[0]*op2.sup[0]])
+            i.sup = max([op1.inf[0]*op2.inf[0], op1.inf[0]*op2.sup[0], op1.sup[0]*op2.inf[0], op1.sup[0]*op2.sup[0]])
+            return i
+        else:
+            I1 = op1.inf
+            S1 = op1.sup
+            m = I1.shape[0]
+            n1 = op2.inf.shape[1]
+            A = Interval()
+            Binf = []
+            Bsup = []
+            for i in range(m):
+                A.inf = matlib.repmat(I1[i, :],n1, 0).conj().T
+                A.sup = matlib.repmat(S1[i, :],n1, 0).conj().T
+                B = Interval_multiplication(A, op2)
+                Binf.append(B.inf.sum(axis=0))
+                Bsup.append(B.sup.sum(axis=0))
+            return Interval(np.array(Binf), np.array(Bsup))
+    elif isinstance(op1, Interval) and isinstance(op2, float):
+        i =  Interval()
+        i.inf = op1.inf*op2
+        i.sup = op1.sup*op2
+        return i
+    elif isinstance(op1, float) and isinstance(op2, Interval):
+        i =  Interval()
+        i.inf = op1*op2.inf
+        i.sup = op1*op2.sup
+        return i
     else:
         raise Exception("Interval multiplication is only defined for Intervals!")
 
@@ -83,3 +112,27 @@ def Interval_selector(obj, S):
         return newObj
     else:
         raise Exception("Interval selector is only defined for Intervals!")
+    
+def zonoToInterval(zono):
+    c = zono.center()
+    delta = np.sum(np.abs(zono.Z)) - np.abs(c)
+    leftLimit = np.subtract(c, delta)
+    rightLimit = np.add(c, delta)
+    return Interval(leftLimit,rightLimit)
+
+def intervals_To_interval(intervals):
+    infs = []
+    sups = []
+    for currint in intervals:
+        infs += get_elements_of_nested_list(currint.inf.tolist())
+        sups += get_elements_of_nested_list(currint.sup.tolist())
+    return Interval(np.array(infs).reshape(-1, 1), np.array(sups).reshape(-1, 1))
+
+def get_elements_of_nested_list(element):
+    res = []
+    if isinstance(element, list):
+        for each_element in element:
+            res += get_elements_of_nested_list(each_element)
+    else:
+        res += [element]
+    return res

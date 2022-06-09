@@ -1,0 +1,12 @@
+{
+    "python.autoComplete.extraPaths": ["D:/Desktop/thesis/Reachability analysis/Linear_sys.py"],
+    "python.pythonPath": "/env/scripts/python.exe",
+    "python.analysis.extraPaths": [
+        "D:/Desktop/thesis/Reachability analysis/Linear_sys.py"
+    ],
+    "python.linting.pylintEnabled": true,
+    "python.linting.enabled": false,
+    "editor.codeActionsOnSave": {
+        "source.organizeImports": false
+    }
+}

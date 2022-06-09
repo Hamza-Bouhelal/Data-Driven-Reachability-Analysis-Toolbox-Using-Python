@@ -55,7 +55,7 @@ class linear_sys():
         self.samplingtime = samplingtime
         self.zonoOrder = zonoOrder
 
-    def build_model(self, totalsteps: int, plot=False, save=''):
+    def Model_Based_Reachability(self, totalsteps: int, plot=False, save=''):
         """
         Compute the system data to compare to the reachability analysis results
         
@@ -104,7 +104,7 @@ class linear_sys():
         utraj = []
         print(f"Propagating {self.initpoints} initpoints {self.steps} time...")
         for _ in tqdm(range(self.initpoints)):
-            #rand = np.array([[0.904], [0.9052], [0.9057], [0.9492], [1.072]])
+            #rand = np.array([[0.904], [0.9052], [0.9057]])
             rand = self.X0.rand_point()
             tempx = [rand]
             curr_point = rand.tolist()
@@ -129,8 +129,8 @@ class linear_sys():
 
     def concat_data_trajs(self, x, utraj):
         final_x = x[0]
-        for initpoint in range(1, len(x)):
-            for dim in range(self.dim_x):
+        for dim in range(self.dim_x):
+            for initpoint in range(1, len(x)):
                 for step in range(self.steps):
                     final_x[dim].append(x[initpoint][dim][step])
         X_0t = np.array([ele[:-1] for ele in final_x])
@@ -144,14 +144,14 @@ class linear_sys():
     def get_AB(self, X_0t, X_1t, U_full):
         """Computes AB that are consistent with the simulated data"""
         Wmatzono = self.buildMw()
-        X1W_cen = X_1t - Wmatzono.center
+        X1W_cen = np.subtract(X_1t,  Wmatzono.center)
         X1W = MatZonotope(X1W_cen, Wmatzono.generators)
         AB = X1W * pinv(np.concatenate((X_0t, U_full), axis=0))
         intAB11 = AB.interval_matrix()
         intAB1 = intAB11.int
         return AB
 
-    def reach(self, totalsteps: int, plot=False, save=''):
+    def Data_Driven_Reachability(self, totalsteps: int, plot=False, save=''):
         """
         Compute the forward reachable set of the system
         
@@ -177,7 +177,7 @@ class linear_sys():
             plot_results(X_data, plot, save, x0=self.X0)
         return X_data
 
-    def Run_reachability_and_model_based(self, totalsteps, plot=False, save=''):
+    def Run_reachability(self, totalsteps, plot=False, save=''):
         """
         Runs both the reachability and model based approaches
         
@@ -185,31 +185,27 @@ class linear_sys():
         plot: if True Plots the results
         save: if not empty create a directory and saves plots of the results to that directory
         """
-        model = self.build_model(totalsteps)
-        X_data = self.reach(totalsteps)
+        model = self.Model_Based_Reachability(totalsteps)
+        X_data = self.Data_Driven_Reachability(totalsteps)
         if plot or save != '':
             plot_results([model, X_data], plot, save,
-                         titles=['Model', 'Reachability'], x0=self.X0)
+                         titles=['Model based Reachability', 'Data driven Reachability'], x0=self.X0)
         return model, X_data
 
 
 if  __name__ == "__main__":
     steps = 100
     initpoints = 1
-    dim_x = 5
-    X0 = Zonotope(np.array(np.ones((dim_x, 1))), 0.1 *
-                  np.diag(np.ones((dim_x, 1)).T[0]))
+    dim_x = 3
+    X0 = Zonotope(np.array(np.ones((dim_x, 1))), 0.15 *np.diag(np.ones((dim_x, 1)).T[0]))
     U = Zonotope(10, 0.25)
-    W = Zonotope(np.array(np.zeros((dim_x, 1))), 0.0005 * np.ones((dim_x, 1)))
-    A = np.array([[-1, -4, 0, 0, 0], [4, -1, 0, 0, 0],
-                 [0, 0, -3, 1, 0], [0, 0, -1, -3, 0], [0, 0, 0, 0, -2]])
-    B_ss = np.ones([5, 1])
-    C = np.array([1, 0, 0, 0, 0])
+    W = Zonotope(np.array(np.zeros((dim_x, 1))), 0.005 * np.ones((dim_x, 1)))
+    A = np.array([[1, 0, 0], [1, 1, 0],[0, 1, 1]])
+    B_ss = np.array([1, -1, 0])
+    C = np.array([1, 0, 0])
     D = 0
     L_sys = linear_sys(A, B_ss, C, D, X0, U, W, dim_x, initpoints, steps, 0.05)
-    model, xdata = L_sys.Run_reachability_and_model_based(
-        5, plot=True)
+    model, X_data = L_sys.Run_reachability(6, plot=True)
     for path in sys.path:
         if path == "D:\\Desktop\\thesis\\brsl\\scripts\\reachability":
             sys.path.remove(path)
-    

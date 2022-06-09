@@ -100,6 +100,8 @@ class NonLinear_sys():
         self.params.params["U"] = U
         self.params.params["R0"] = R0
         self.func = func
+        self.u = [U.rand_point() for _ in range(self.totalsamples)]
+
 
     def buildMW(self):
         """ 
@@ -128,7 +130,6 @@ class NonLinear_sys():
         Simulates the system with the given parameters
         """
         x = []
-        self.u = [U.rand_point() for _ in range(self.totalsamples)]
         idx = 0
         print(f"Propagating {self.initpoints} initpoints {self.steps} time...")
         for _ in tqdm(range(0, self.initpoints*self.dim_x, self.dim_x)):
@@ -185,7 +186,7 @@ class NonLinear_sys():
 
     
 
-    def run_reachability(self, totalsteps, plot=False, save=''):
+    def Data_Driven_Reachability(self, totalsteps, plot=False, save=''):
         """
         Compute the forward reachable set of the system
         
@@ -209,21 +210,19 @@ class NonLinear_sys():
         t2 = time.time() - t1
         print("Reachability took {} seconds.\n\n".format(t2))
         if plot or save != '':
-            plot_results([R_data], plot, save, ["Reachability"])
+            plot_results([R_data], plot, save, ["Reachability"], x0=self.R0)
         return R_data
 
 
 if __name__ == "__main__":
     dim_x = 2
-    U = Zonotope(np.array(np.array([0.01, 0.01]).reshape((2, 1))),
-                 np.diag([0.1, .2]))
-    R0 = Zonotope(np.array([-1.9, -20]).reshape((dim_x, 1)),
-                  np.diag([0.005, .3]))
+    U = Zonotope(np.array(np.array([0.01, 0.01]).reshape((2, 1))),np.diag([0.1, .2]))
+    R0 = Zonotope(np.array([-1.9, -20]).reshape((dim_x, 1)),np.diag([0.005, .3]))
     dt = 0.015
     initpoints = 1
     steps = 20
     wfac = 1e-4
     nl_sys = NonLinear_sys(dt, U, R0, wfac, dim_x, initpoints, steps, cstrdiscr)
-    data = nl_sys.run_reachability(5, False)
-    model = [R0] + load_model()
-    plot_results([model, data], True, "", ["Model", "Reachability"], x0=R0)
+    data = nl_sys.Data_Driven_Reachability(5, plot=False)
+    model = load_model()
+    plot_results([model, data], True, "", ["Model based Reachability", "Data driven Reachability"], x0=R0)
