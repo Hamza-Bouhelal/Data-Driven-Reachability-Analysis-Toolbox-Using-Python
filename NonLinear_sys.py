@@ -12,9 +12,6 @@ warnings.filterwarnings("ignore", category=RuntimeWarning)
 warnings.filterwarnings("ignore", category=np.VisibleDeprecationWarning)
 from Zonotope import Zonotope
 from MatZonotope import MatZonotope
-from utils.Options import Options
-from utils.Params import Params
-from reachability_nonlinear import params2options, checkOptionsReach
 from Interval import Interval
 import numpy.matlib as matlib
 
@@ -33,35 +30,13 @@ def cstrdiscr(dt, x, u, rho = 1000, Cp = 0.239, deltaH = -5e4, E_R = 8750, k0 = 
     f2 = f2 - T_0
     return np.array([f1, f2]).reshape(2, 1)
 
-def load_model():
+def load_model(n=5):
+    """
+    loads Model based reachability of discrete-time version of the stirred-tank reactor system
+    """
     with open('NonLinear_Model.obj', 'rb') as f:
-        return pickle.load(f)
+        return pickle.load(f)[:n]
     
-
-def linReach_DT(data, options):
-        options.params["Uorig"] = options.params["U"] + \
-            options.params["uTrans"]
-        xStar = data.center()
-        uStar = options.params["Uorig"].center()
-        xStarMat = matlib.repmat(xStar, 1, options.params["X_0T"].shape[1])
-        uStarMat = matlib.repmat(uStar, 1, options.params["U_full"].shape[1])
-        oneMat = matlib.repmat(
-            np.array([1]), 1, options.params["U_full"].shape[1])
-        IAB = np.dot(options.params["X_1T"], pinv(np.vstack(
-            [oneMat, options.params["X_0T"] + (-1 * xStarMat), options.params["U_full"] + -1 * uStarMat])))
-        V = -1 * (options.params["Wmatzono"] + np.dot(IAB, np.vstack([oneMat, options.params["X_0T"]+(-1*xStarMat), options.params["U_full"] +
-            -1 * uStarMat]))) + options.params["X_1T"]
-        VInt = V.interval_matrix()
-        leftLimit = VInt.Inf
-        rightLimit = VInt.Sup
-        V_one = Zonotope(Interval(leftLimit.min(
-            axis=1).T, rightLimit.max(axis=1).T))
-        x = data+(-1*xStar)
-        result = (x.cart_prod(options.params["Uorig"] + (-1 * uStar)).cart_prod(
-            [1]) * IAB) + V_one + options.params["W"] + options.params["Zeps"]
-        return result
-
-
 
 class NonLinear_sys():
     """
@@ -86,30 +61,24 @@ class NonLinear_sys():
         self.dt = dt
         self.U = U
         self.R0 = R0
-        self.params = Params(tFinal=self.dt * 5, dt=self.dt)
-        self.options = Options()
-        self.options.params["dim_x"] = self.dim_x
         self.initpoints = initpoints
         self.steps = steps
         self.totalsamples = steps * initpoints
         self.wfac = wfac
         self.buildMW()
-        self.options.params["zonotopeOrder"] = zonoOrder
-        self.options.params["tensorOrder"] = tensorOrder
-        self.options.params["errorOrder"] = errorOrder
-        self.params.params["U"] = U
-        self.params.params["R0"] = R0
+        self.zonotopeOrder = zonoOrder
+        self.tensorOrder = tensorOrder
+        self.errorOrder = errorOrder
         self.func = func
         self.u = [U.rand_point() for _ in range(self.totalsamples)]
+        self.ZepsFlag = False
 
 
     def buildMW(self):
         """ 
         Builds the noise MatZonotope Mw from the noise zonotope W
         """
-        self.W = Zonotope(np.array(np.zeros(
-            (self.options.params["dim_x"], 1))), self.wfac * np.ones((self.options.params["dim_x"], 1)))
-        self.params.params["W"] = self.W
+        self.W = Zonotope(np.array(np.zeros((self.dim_x, 1))), self.wfac * np.ones((self.dim_x, 1)))
         self.GW = []
         for i in range(self.W.generators().shape[1]):
             vec = np.reshape(self.W.Z[:, i + 1], (self.dim_x, 1))
@@ -122,7 +91,7 @@ class NonLinear_sys():
                 dummy.append(np.hstack((left, right)))
             self.GW.append(np.array(dummy))
         self.GW = np.array(self.GW[0])
-        self.params.params["Wmatzono"] = MatZonotope(
+        self.Wmatzono = MatZonotope(
             np.zeros((self.dim_x, self.totalsamples)), self.GW)
 
     def Simulate_sys(self):
@@ -160,13 +129,41 @@ class NonLinear_sys():
         #print(X_1t.shape)
         U_full = np.array(self.u).reshape((-1, self.totalsamples))
         #print(U_full.shape)
-        self.options.params["X_0T"] = X_0t
-        self.options.params["X_1T"] = X_1t
-        self.options.params["U_full"] = U_full
-        return X_0t, X_1t
+        self.X_0t = X_0t
+        self.X_1t = X_1t
+        self.U_full = U_full
+        return X_0t, X_1t, U_full
 
-    def compute_Lipschits_const(self, X_0t, X_1t):
+    def compute_Lipschits_const(self, steps, initpoints):
+
         """Computes the Lipschitz constant of the system"""
+        """ x = self.Simulate_sys()
+        X_0t, X_1t, u = self.combine_trajs(x)
+        normtype = 2
+        L = []
+        gamma = []
+        for dim in range(self.dim_x):
+            L.append([0])
+            gamma.append(0)
+            for i in range(self.totalsamples):
+                z1 = np.hstack([np.array(X_0t[:, i]).flatten(), np.array(self.u).flatten(order='F')[i]])
+                f1 = np.array([X_1t[:, i]])
+                for j in range(self.totalsamples):
+                    if i != j:
+                        z2 = np.hstack([np.array(X_0t)[:, j].flatten(), np.array(self.u).flatten(order='F')[j]])
+                        f2 = np.array([X_1t[:, j]])
+                        newnorm = np.linalg.norm(np.subtract(f1, f2), normtype)  / np.linalg.norm(np.subtract(z1, z2), normtype)
+                        newgamma = np.linalg.norm(np.subtract(z1, z2), normtype)
+                        if newnorm > L[dim]:
+                            L[dim] = newnorm 
+                            #eps = L * np.linalg.norm(np.subtract(z1, z2))
+                        if newgamma > gamma[dim]:
+                            gamma[dim] = newgamma
+        eps = [L[i] * gamma[i]/2 for i in range(self.dim_x)]
+        self.Zeps = Zonotope(np.array(np.zeros(
+            (self.dim_x, 1))),  np.diag(eps))
+        self.ZepsFlag = True """
+
         """ L = 0
         for i in range(self.totalsamples):
             z1 = np.hstack([np.array(X_0t[:, i]).flatten(), np.array(self.u).flatten(order='F')[i]])
@@ -177,42 +174,62 @@ class NonLinear_sys():
                 newnorm = np.linalg.norm(np.subtract(f1, f2))  / np.linalg.norm(np.subtract(z1, z2))
                 if newnorm > L:
                     L = newnorm 
-                    eps = L * np.linalg.norm(np.subtract(z1, z2))
-        print(eps) """
-        eps = 0.0035
-        self.options.params["Zeps"] = Zonotope(np.array(np.zeros(
-            (self.dim_x, 1))), eps * np.diag(np.ones((self.options.params["dim_x"], 1)).T[0]))
-        self.options.params["ZepsFlag"] = True
+                    eps = L * np.linalg.norm(np.subtract(z1, z2))"""
+        eps = 0.0035 
+        self.Zeps = Zonotope(np.array(np.zeros(
+            (self.dim_x, 1))), eps * np.diag(np.ones((self.dim_x, 1)).T[0]))
+        self.ZepsFlag = True
 
-    
+    def linReach_DT(self, data):
+        xStar = data.center()
+        uStar = self.U.center()
+        xStarMat = matlib.repmat(xStar, 1, self.X_0t.shape[1])
+        uStarMat = matlib.repmat(uStar, 1, self.U_full.shape[1])
+        oneMat = matlib.repmat(
+            np.array([1]), 1, self.U_full.shape[1])
+        IAB = np.dot(self.X_1t, pinv(np.vstack(
+            [oneMat, self.X_0t + (-1 * xStarMat), self.U_full + -1 * uStarMat])))
+        V = -1 * (self.Wmatzono + np.dot(IAB, np.vstack([oneMat, self.X_0t+(-1*xStarMat), self.U_full +
+            -1 * uStarMat]))) + self.X_1t
+        VInt = V.interval_matrix()
+        leftLimit = VInt.Inf
+        rightLimit = VInt.Sup
+        V_one = Zonotope(Interval(leftLimit.min(
+            axis=1).T, rightLimit.max(axis=1).T))
+        x = data+(-1*xStar)
+        if self.ZepsFlag:
+            result = (x.cart_prod(self.U + (-1 * uStar)).cart_prod(
+            [1]) * IAB) + V_one + self.W + self.Zeps
+        else:
+            result =  (x.cart_prod(self.U + (-1 * uStar)).cart_prod(
+            [1]) * IAB) + V_one + self.W
+        return result
 
-    def Data_Driven_Reachability(self, totalsteps, plot=False, save=''):
+    def Data_Driven_Reachability(self, totalsteps, ZepsFlag=True, plot=False, save=''):
         """
-        Compute the forward reachable set of the system
+        Computes the data driven reachable set of the system
         
         totalsteps: number of steps to be computed
+        ZepsFlag: if true compute the Lipschitz constant of the system and add eps zonotope to each steps of the result
         plot: if True Plots the results
         save: if not empty create a directory and saves plots of the results to that directory
         """
         x = self.Simulate_sys()
-        X_0t, X_1t = self.combine_trajs(x)
-        self.compute_Lipschits_const(X_0t, X_1t)
-        options = params2options(self.params, self.options)
-        options = checkOptionsReach(options, 0)
-        R_data = [self.params.params["R0"]]
+        X_0t, X_1t, u = self.combine_trajs(x)
+        if ZepsFlag:
+            self.compute_Lipschits_const(X_0t, X_1t)
+        R_data = [self.R0]
         print("Computing reachability...")
         t1 = time.time()
         for i in tqdm(range(totalsteps)):
-            if('uTransVec' in options.params):
-                options.params['uTrans'] = options.params["uTransVec"][:, i]
-            data = linReach_DT(R_data[i], options)
-            R_data.append(reduce_girard(data, self.options.params["zonotopeOrder"] ))
+            data = self.linReach_DT(R_data[i])
+            R_data.append(reduce_girard(data, self.zonotopeOrder ))
         t2 = time.time() - t1
         print("Reachability took {} seconds.\n\n".format(t2))
         if plot or save != '':
-            plot_results([R_data], plot, save, ["Reachability"], x0=self.R0)
+            plot_results([R_data], plot, save, ["Data driven Reachability"], x0=self.R0, fillFirstResult=False)
         return R_data
-
+ 
 
 if __name__ == "__main__":
     dim_x = 2
@@ -220,9 +237,9 @@ if __name__ == "__main__":
     R0 = Zonotope(np.array([-1.9, -20]).reshape((dim_x, 1)),np.diag([0.005, .3]))
     dt = 0.015
     initpoints = 1
-    steps = 20
-    wfac = 1e-4
+    steps = 25
+    wfac = 10**-4
     nl_sys = NonLinear_sys(dt, U, R0, wfac, dim_x, initpoints, steps, cstrdiscr)
-    data = nl_sys.Data_Driven_Reachability(5, plot=False)
+    data = nl_sys.Data_Driven_Reachability(5, True, plot=False)
     model = load_model()
     plot_results([model, data], True, "", ["Model based Reachability", "Data driven Reachability"], x0=R0)

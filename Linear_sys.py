@@ -6,6 +6,7 @@ from tqdm import tqdm
 from Plot import plot_results
 from Utils import reduce_girard
 import time
+#from numba import jit
 import sys
 sys.path.append("D:\\Desktop\\thesis\\brsl\\scripts\\reachability")
 from Zonotope import Zonotope
@@ -17,9 +18,8 @@ class linear_sys():
     """
     Linear time system
     x(k+1) = Ax(k) + Bu(k) + w(k)
+    A, B, C, D represent the system dynamics
 
-    A: State matrix
-    B: Input matrix
     X0: Initial reachable set zonotope
     U: Input zonotope
     W: Noise zonotope
@@ -177,6 +177,7 @@ class linear_sys():
             plot_results(X_data, plot, save, x0=self.X0)
         return X_data
 
+    #@jit(nopython=True)
     def Run_reachability(self, totalsteps, plot=False, save=''):
         """
         Runs both the reachability and model based approaches
@@ -188,24 +189,24 @@ class linear_sys():
         model = self.Model_Based_Reachability(totalsteps)
         X_data = self.Data_Driven_Reachability(totalsteps)
         if plot or save != '':
-            plot_results([model, X_data], plot, save,
+            plot_results([model[1:], X_data], plot, save,
                          titles=['Model based Reachability', 'Data driven Reachability'], x0=self.X0)
         return model, X_data
 
 
 if  __name__ == "__main__":
-    steps = 100
+    steps = 50
     initpoints = 1
-    dim_x = 3
-    X0 = Zonotope(np.array(np.ones((dim_x, 1))), 0.15 *np.diag(np.ones((dim_x, 1)).T[0]))
+    dim_x = 5
+    X0 = Zonotope(np.array(np.ones((dim_x, 1))), 0.1 *np.diag(np.ones((dim_x, 1)).T[0]))
     U = Zonotope(10, 0.25)
-    W = Zonotope(np.array(np.zeros((dim_x, 1))), 0.005 * np.ones((dim_x, 1)))
-    A = np.array([[1, 0, 0], [1, 1, 0],[0, 1, 1]])
-    B_ss = np.array([1, -1, 0])
-    C = np.array([1, 0, 0])
+    W = Zonotope(np.array(np.zeros((dim_x, 1))), 0.0005 * np.ones((dim_x, 1)))
+    A = np.array([[-1, -4, 0, 0, 0], [4, -1, 0, 0, 0],[0, 0, -3, 1, 0], [0, 0, -1, -3, 0], [0, 0, 0, 0, -2]])
+    B_ss = np.array([1, 1, 1, 1, 1])
+    C = np.array([1, 0, 0, 0, 0])
     D = 0
     L_sys = linear_sys(A, B_ss, C, D, X0, U, W, dim_x, initpoints, steps, 0.05)
-    model, X_data = L_sys.Run_reachability(6, plot=True)
+    model, X_data = L_sys.Run_reachability(5, plot=True)
     for path in sys.path:
         if path == "D:\\Desktop\\thesis\\brsl\\scripts\\reachability":
             sys.path.remove(path)

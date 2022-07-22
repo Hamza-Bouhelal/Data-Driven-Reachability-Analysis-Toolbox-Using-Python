@@ -164,7 +164,7 @@ class Poly_sys:
         # print(U_full.shape)
         return X_0t, X_1t, U_full
 
-    def compute_monomials(self, X_0t, X_1t, U_full):
+    def compute_monomials_2d(self, X_0t, X_1t, U_full):
         """
         Compute the monomials of the system using the simulated data
         """
@@ -188,9 +188,11 @@ class Poly_sys:
         plot: if True, plots the reachable set
         save: if not empty, saves the reachable set to the file
         """
+        if self.dim_x != 2:
+            raise ValueError("Data driven reachability for polynomial systems is only implemented for 2D systems")
         x = self.Simulate_sys()
         X_0t, X_1t, U_full = self.combine_trajs(x)
-        AB = self.compute_monomials(X_0t, X_1t, U_full)
+        AB = self.compute_monomials_2d(X_0t, X_1t, U_full)
         data = [self.R0]
         print(f"Computing Reachability...")
         t1 = time.time()
@@ -222,12 +224,10 @@ if __name__ == "__main__":
     dim_x = 2
     initpoints = 1
     steps = 7
-    wfac = 0.000007
+    wfac = 0.000001
     poly_sys = Poly_sys(dt, U, R0, wfac, dim_x,
                         initpoints, steps, poly_func)
     data = poly_sys.Data_Driven_Reachability(N, False)
     model = load_model(N)
     plot_results([model, data], True, "", ["Model based Reachability", "Data driven Reachability"], x0=R0)
-
-    
   

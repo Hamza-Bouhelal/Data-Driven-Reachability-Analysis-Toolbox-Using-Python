@@ -29,7 +29,7 @@ def get_points_2d(zono, step):
     return tempx, tempy
 
 
-def plot_zono(ax, Z, step, color):
+def plot_zono(ax, Z, step, color, fill=False):
     """Plots dims 'step' and 'step' + 1 of the zonotope Z"""
     x, y = get_points_2d(Z, step)
     all = []
@@ -43,15 +43,19 @@ def plot_zono(ax, Z, step, color):
     temp.append(temp[0])
     temp = np.array(temp)
     ax.plot(all[temp,0], all[temp,1], color=color, lw=1)
+    if fill:
+        ax.fill(all[temp,0], all[temp,1], color=color, alpha=0.2)
 
 
-def plot_results(data, plot=True, save='', titles=[], x0=None):
+def plot_results(data, plot=True, save='', titles=[], x0=None, fillFirstResult=True):
     """Plots all 2d dimensions of the zonotopes inside the list 'data' or lists of zonotope in 'data'.
     
+    data: list of zonotopes or list of lists of zonotopes
     plot: if True, plots the results.
     save: if not empty, saves the results in the directory 'save'.
     titles: if not empty, plots the results with the titles in the list 'titles'.
     x0: if not None, plots zonotope x0 over the results.
+    fillFirstResult: if True, fills the plot of the first list of results in data.
     """
     if isinstance(data, list) and False not in [isinstance(ele, Zonotope) for ele in data]:
         data = [data]
@@ -80,7 +84,10 @@ def plot_results(data, plot=True, save='', titles=[], x0=None):
             except:
                 pass
             for ele in result:
-                plot_zono(ax, ele, i*2, color)
+                if tt == 1 and fillFirstResult:
+                    plot_zono(ax, ele, i*2, color, fill=True)
+                else:
+                    plot_zono(ax, ele, i*2, color)
         ax.set_xlabel('X' + str(i*2 + 1))
         ax.set_ylabel('X' + str(i*2+ 2))
         if x0 is not None:
@@ -111,7 +118,10 @@ def plot_results(data, plot=True, save='', titles=[], x0=None):
                     except:
                         pass
                     for ele in result:
-                        plot_zono(ax, ele, i*2 + 1, color)
+                        if tt == 1 and fillFirstResult:
+                            plot_zono(ax, ele, i*2 + 1, color, fill=True)
+                        else:
+                            plot_zono(ax, ele, i*2 + 1, color)
                 ax.set_xlabel('X' + str(i*2 + 2))
                 ax.set_ylabel('X ' + str(i*2 + 3))
                 if x0 is not None:
@@ -139,5 +149,5 @@ def makedir(save):
             temp = final_directory + f' ({str(t)})'
         final_directory = temp
     os.mkdir(final_directory)
-    print("\nCreated directory at : ", final_directory)
+    print("\nCreated drectory at : ", final_directory)
     return final_directory
