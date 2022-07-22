@@ -14,7 +14,7 @@ from Zonotope import Zonotope
 from MatZonotope import MatZonotope
 from Interval import Interval
 import numpy.matlib as matlib
-
+np.random.seed(5)
 def cstrdiscr(dt, x, u, rho = 1000, Cp = 0.239, deltaH = -5e4, E_R = 8750, k0 = 7.2e10, UA = 5e4, q = 100, Tf = 350, V = 100, C_Af = 1, C_A0 = 0.5, T_0 = 350, T_c0 = 300):
     """
         discrete-time version of the stirred-tank reactor system
@@ -71,7 +71,7 @@ class NonLinear_sys():
         self.errorOrder = errorOrder
         self.func = func
         self.u = [U.rand_point() for _ in range(self.totalsamples)]
-        self.ZepsFlag = False
+        """ self.ZepsFlag = False """
 
 
     def buildMW(self):
@@ -137,8 +137,7 @@ class NonLinear_sys():
     def compute_Lipschits_const(self, steps, initpoints):
 
         """Computes the Lipschitz constant of the system"""
-        """ x = self.Simulate_sys()
-        X_0t, X_1t, u = self.combine_trajs(x)
+        X_0t, X_1t, = self.X_0t, self.X_1t
         normtype = 2
         L = []
         gamma = []
@@ -162,23 +161,6 @@ class NonLinear_sys():
         eps = [L[i] * gamma[i]/2 for i in range(self.dim_x)]
         self.Zeps = Zonotope(np.array(np.zeros(
             (self.dim_x, 1))),  np.diag(eps))
-        self.ZepsFlag = True """
-
-        """ L = 0
-        for i in range(self.totalsamples):
-            z1 = np.hstack([np.array(X_0t[:, i]).flatten(), np.array(self.u).flatten(order='F')[i]])
-            f1 = np.array([X_1t[:, i]])
-            for j in range(self.totalsamples):
-                z2 = np.hstack([np.array(X_0t)[:, j].flatten(), np.array(self.u).flatten(order='F')[j]])
-                f2 = np.array([X_1t[:, j]])
-                newnorm = np.linalg.norm(np.subtract(f1, f2))  / np.linalg.norm(np.subtract(z1, z2))
-                if newnorm > L:
-                    L = newnorm 
-                    eps = L * np.linalg.norm(np.subtract(z1, z2))"""
-        eps = 0.0035 
-        self.Zeps = Zonotope(np.array(np.zeros(
-            (self.dim_x, 1))), eps * np.diag(np.ones((self.dim_x, 1)).T[0]))
-        self.ZepsFlag = True
 
     def linReach_DT(self, data):
         xStar = data.center()
@@ -197,12 +179,8 @@ class NonLinear_sys():
         V_one = Zonotope(Interval(leftLimit.min(
             axis=1).T, rightLimit.max(axis=1).T))
         x = data+(-1*xStar)
-        if self.ZepsFlag:
-            result = (x.cart_prod(self.U + (-1 * uStar)).cart_prod(
-            [1]) * IAB) + V_one + self.W + self.Zeps
-        else:
-            result =  (x.cart_prod(self.U + (-1 * uStar)).cart_prod(
-            [1]) * IAB) + V_one + self.W
+        result =  (x.cart_prod(self.U + (-1 * uStar)).cart_prod(
+            [1]) * IAB) + V_one  + self.W
         return result
 
     def Data_Driven_Reachability(self, totalsteps, ZepsFlag=True, plot=False, save=''):
@@ -216,14 +194,16 @@ class NonLinear_sys():
         """
         x = self.Simulate_sys()
         X_0t, X_1t, u = self.combine_trajs(x)
-        if ZepsFlag:
-            self.compute_Lipschits_const(X_0t, X_1t)
         R_data = [self.R0]
         print("Computing reachability...")
         t1 = time.time()
         for i in tqdm(range(totalsteps)):
             data = self.linReach_DT(R_data[i])
             R_data.append(reduce_girard(data, self.zonotopeOrder ))
+        if ZepsFlag:
+            self.compute_Lipschits_const(X_0t, X_1t)
+            for ele in R_data[1:]:
+                ele += self.Zeps
         t2 = time.time() - t1
         print("Reachability took {} seconds.\n\n".format(t2))
         if plot or save != '':
