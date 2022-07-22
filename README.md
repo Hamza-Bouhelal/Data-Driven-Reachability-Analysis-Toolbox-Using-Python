@@ -9,7 +9,7 @@
 ### Python Dependencies
 - Python & pip
 - Zonotope Set representation Implementation
-- other dependencies: 
+- Other dependencies: 
 ```
 cd Data-Driven-Reachability-Analysis-Toolbox-Using-Python
 pip install virtualenv
