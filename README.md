@@ -9,11 +9,14 @@
 ### Python Dependencies
 - Python & pip
 - Zonotope Set representation Implementation
-- ```cd Data-Driven-Reachability-Analysis-Toolbox-Using-Python```
-- ```pip install virtualenv```
-- ```virtualenv env```
-- ```.\venv\Scripts\activate```
-- ```pip install -r requirements.txt```
+- other dependencies: 
+```
+cd Data-Driven-Reachability-Analysis-Toolbox-Using-Python
+pip install virtualenv
+virtualenv env
+.\venv\Scripts\activate
+pip install -r requirements.txt
+```
 
 ## Example: 
 ```
