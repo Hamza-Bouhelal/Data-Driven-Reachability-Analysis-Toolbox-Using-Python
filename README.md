@@ -3,21 +3,23 @@
 <br/>
 ## Setup: 
 ### Git
-- Initilize a repository in an empty directory:  `git init` <br/>
-- run: `git clone https://github.com/Hamza-Bouhelal/Data-Driven-Reachability-Analysis-Toolbox-Using-Python` <br/>
-- use `git status` to check whether everything is up to date <br/>
+- Initilize a repository in an empty directory:  ```git init``` <br/>
+- run: ```git clone https://github.com/Hamza-Bouhelal/Data-Driven-Reachability-Analysis-Toolbox-Using-Python``` <br/>
+- use ```git status``` to check whether everything is up to date <br/>
 ### Python Dependencies
 - Python & pip
 - Zonotope Set representation Implementation
-- `cd Data-Driven-Reachability-Analysis-Toolbox-Using-Python`
-- `pip install virtualenv`
-- `virtualenv env`
-- `.\venv\Scripts\activate`
-- `pip install -r requirements.txt`
+- ```cd Data-Driven-Reachability-Analysis-Toolbox-Using-Python```
+- ```pip install virtualenv```
+- ```virtualenv env```
+- ```.\venv\Scripts\activate```
+- ```pip install -r requirements.txt```
 
 ## Example: 
 ```
     from Linear_sys import linear_sys
+    import numpy as np
+    from Zonotope import Zonotope
     steps = 100
     initpoints = 1
     dim_x = 3
