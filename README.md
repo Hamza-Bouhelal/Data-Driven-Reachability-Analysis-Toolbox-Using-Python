@@ -5,7 +5,6 @@
 ### Git
 - Initilize a repository in an empty directory:  ```git init``` <br/>
 - run: ```git clone https://github.com/Hamza-Bouhelal/Data-Driven-Reachability-Analysis-Toolbox-Using-Python``` <br/>
-- use ```git status``` to check whether everything is up to date <br/>
 ### Python Dependencies
 - Python & pip
 - Zonotope Set representation Implementation
